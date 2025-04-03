@@ -7,7 +7,7 @@ use App\Http\Controllers\BioRegistrationController;
 use App\Http\Controllers\CourseController;
 use App\Http\Controllers\CourseDataController;
 use App\Http\Controllers\EducationalDetailsController;
-use App\Http\Controllers\fileUploadController;
+use App\Http\Controllers\FileUploadController;
 use App\Http\Controllers\PersonalDetailController;
 use App\Http\Controllers\StudentDetailController;
 use Illuminate\Support\Facades\Route;
@@ -56,7 +56,7 @@ Route::apiResource('bio-registrations', BioRegistrationController::class);
 Route::get('/applications/{id}', [ApplicationController::class, 'show']);
 Route::put('/applications/{id}', [ApplicationController::class, 'update']);
 // Route::post('/student_check', [ApplicationController::class, 'studentCheck']);
-Route::post('/upload', [fileUploadController::class, 'upload'])->name('file.upload');
+Route::post('/upload', [FileUploadController::class, 'upload'])->name('file.upload');
 Route::post('/multi-upload', [FileUploadController::class, 'multiUpload']);
 Route::get('/file/get/{filename}/{visibility?}', [FileUploadController::class, 'getFile'])->name('file.get');
 
