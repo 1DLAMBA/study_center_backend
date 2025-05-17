@@ -78,6 +78,17 @@ class PersonalDetailController extends Controller
             'total' => $personalDetails->total(),
         ], 200);
     }
+
+    public function reference($reference)
+    
+    {
+        $personalDetail = PersonalDetail::where('application_reference', $reference)->first();
+        if ($personalDetail){
+            return response()->json(['message' => 'Student found', 'data'=>$personalDetail], 200);
+        } else{
+            return response()->json(['message' => 'Student not found', 'status'=>404], 404);
+        }
+    }
     
 
 

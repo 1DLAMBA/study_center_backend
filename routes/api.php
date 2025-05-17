@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\ApplicationController;
+use App\Http\Controllers\PaymentController;
 use Illuminate\Http\Request;
 use App\Http\Controllers\BioDataController;
 use App\Http\Controllers\BioRegistrationController;
@@ -42,6 +43,7 @@ Route::post('/school-fees', [ApplicationController::class, 'school_fees']);
 Route::post('/student_check', [PersonalDetailController::class, 'find']);
 Route::apiResource('personal-details', PersonalDetailController::class);
 Route::get('personal-details-paged', [PersonalDetailController::class, 'indexPage']);
+Route::get('verify_reference/{reference}', [PersonalDetailController::class, 'reference']);
 Route::post('import/{centre}', [PersonalDetailController::class, 'import']);
 Route::post('check', [PersonalDetailController::class, 'check']);
 Route::get('approve/{id}', [PersonalDetailController::class, 'approve']);
@@ -63,3 +65,6 @@ Route::get('/file/get/{filename}/{visibility?}', [FileUploadController::class, '
 
 Route::apiResource('bio-data', BioDataController::class);
 // Route::get('/bio-data/{id}', [BioDataController::class, 'show']);
+
+// WEBHOOK
+Route::post('/paystack/webhook', [PaymentController::class, 'handleWebhook']);

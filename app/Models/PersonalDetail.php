@@ -161,6 +161,8 @@ class PersonalDetail extends Model
             $matCentre = 'KC'; // Default or other centre code
         } elseif ($centre == 'Doko') {
             $matCentre = 'DK'; // Default or other centre code
+        } elseif ($centre == 'Gawu') {
+            $matCentre = 'GW'; // Default or other centre code
         }
 
 
@@ -180,6 +182,11 @@ class PersonalDetail extends Model
         $newNumber = str_pad($lastNumber + 1, 5, '0', STR_PAD_LEFT);
         $year = date('y'); // Get the current year (e.g., 24)
         $newGenerated = '1' . $newNumber;
-        return "{$matCentre}/{$courseCode}/{$year}/{$newGenerated}";
+        $newMatricNumber = "{$matCentre}/{$courseCode}/{$year}/{$newGenerated}";
+        while(self::where('matric_number', $newMatricNumber)->exists()) {
+            $newGenerated++;
+            $newMatricNumber = "{$matCentre}/{$courseCode}/{$year}/{$newGenerated}";
+        }
+        return  $newMatricNumber;
     }
 }
