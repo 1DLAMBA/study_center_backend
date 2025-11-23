@@ -110,7 +110,7 @@ class PersonalDetailController extends Controller
     {
         $applicationNumber = $request->input('phoneNumber');
 
-        $personalDetail = PersonalDetail::with('educationalDetail')->where('phone_number', $applicationNumber)->first();
+        $personalDetail = PersonalDetail::with('educationalDetail','studentDetail')->where('phone_number', $applicationNumber)->first();
         if ($personalDetail){
             return response()->json(['message' => 'Student found', 'user'=>$personalDetail], 200);
         } else{
@@ -185,7 +185,7 @@ class PersonalDetailController extends Controller
 
         $applicationNumber = $request->input('application_number');
 
-        $personalDetail = PersonalDetail::where('application_number', $applicationNumber)->first();
+        $personalDetail = PersonalDetail::with('studentDetail')->where('application_number', $applicationNumber)->first();
         if ($personalDetail){
 
             if ($personalDetail->has_admission){

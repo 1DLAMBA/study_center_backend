@@ -25,6 +25,7 @@ class BioRegistrationController extends Controller
             'next_of_kin_relationship' => 'nullable|string',
             'next_of_kin_phone_number' => 'nullable|string',
             'next_of_kin_address' => 'nullable|string',
+            'place_of_birth' => 'nullable|string',
             'nationality' => 'nullable|string',
             'mode_of_entry' => 'nullable|string',
             'session' => 'nullable|string',
@@ -77,6 +78,7 @@ class BioRegistrationController extends Controller
             'nationality' => 'nullable|string',
             'level' => 'nullable|string',
             'mode_of_entry' => 'nullable|string',
+            'place_of_birth' => 'nullable|string',
             'session' => 'nullable|string',
             'subject_combination' => 'nullable|string',
         ]);

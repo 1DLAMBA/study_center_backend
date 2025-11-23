@@ -54,7 +54,7 @@ class PersonalDetail extends Model
 
     public function studentDetail()
     {
-        return $this->hasOne(StudentDetail::class, 'id', 'application_number');
+        return $this->hasOne(StudentDetail::class,  'application_number', 'id');
     }
     public function educationalDetail()
     {
@@ -163,7 +163,12 @@ class PersonalDetail extends Model
             $matCentre = 'DK'; // Default or other centre code
         } elseif ($centre == 'Gawu') {
             $matCentre = 'GW'; // Default or other centre code
+        } elseif ($centre == 'Bida') {
+            $matCentre = 'BD'; // Default or other centre code
+        } elseif ($centre == 'Patigi') {
+            $matCentre = 'PG'; // Default or other centre code
         }
+        
 
 
         // Get the last matric number for this program

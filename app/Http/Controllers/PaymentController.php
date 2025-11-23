@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Controllers\Controller;
 use App\Models\PersonalDetail;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
 class PaymentController extends Controller
@@ -137,6 +138,13 @@ class PaymentController extends Controller
                 }
         
             }
+            break;
+        case 'ibbul_acceptance_fees':
+            // Handle successful charge
+            Log::info('Webhook IBBUL Acceptance Fees HERE', [
+                'payload' => $request->all(),
+            ]);
+            Http::post('http://127.0.0.1:9000/api/paystack/webhook', $payload);
             break;
         default:
             return response()->json(['status' => 'ignored']);
