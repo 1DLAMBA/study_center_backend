@@ -167,6 +167,8 @@ class PersonalDetail extends Model
             $matCentre = 'BD'; // Default or other centre code
         } elseif ($centre == 'Patigi') {
             $matCentre = 'PG'; // Default or other centre code
+        } elseif ($centre == 'Pandogari') {
+            $matCentre = 'PD'; // Default or other centre code
         }
         
 
@@ -185,7 +187,7 @@ class PersonalDetail extends Model
 
         // Generate the new matric number
         $newNumber = str_pad($lastNumber + 1, 5, '0', STR_PAD_LEFT);
-        $year = date('y'); // Get the current year (e.g., 24)
+        $year = "26"; // Get the current year (e.g., 24)
         $newGenerated = '1' . $newNumber;
         $newMatricNumber = "{$matCentre}/{$courseCode}/{$year}/{$newGenerated}";
         while(self::where('matric_number', $newMatricNumber)->exists()) {
