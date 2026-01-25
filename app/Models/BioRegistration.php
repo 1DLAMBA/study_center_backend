@@ -21,6 +21,7 @@ class BioRegistration extends Model
         'nationality',
         'level',
         'mode_of_entry',
+        'place_of_birth',
         'session',
         'subject_combination',
     ];

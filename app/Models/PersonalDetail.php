@@ -54,7 +54,7 @@ class PersonalDetail extends Model
 
     public function studentDetail()
     {
-        return $this->hasOne(StudentDetail::class, 'id', 'application_number');
+        return $this->hasOne(StudentDetail::class,  'application_number', 'id');
     }
     public function educationalDetail()
     {
@@ -161,7 +161,16 @@ class PersonalDetail extends Model
             $matCentre = 'KC'; // Default or other centre code
         } elseif ($centre == 'Doko') {
             $matCentre = 'DK'; // Default or other centre code
+        } elseif ($centre == 'Gawu') {
+            $matCentre = 'GW'; // Default or other centre code
+        } elseif ($centre == 'Bida') {
+            $matCentre = 'BD'; // Default or other centre code
+        } elseif ($centre == 'Patigi') {
+            $matCentre = 'PG'; // Default or other centre code
+        } elseif ($centre == 'Pandogari') {
+            $matCentre = 'PD'; // Default or other centre code
         }
+        
 
 
         // Get the last matric number for this program
@@ -178,8 +187,13 @@ class PersonalDetail extends Model
 
         // Generate the new matric number
         $newNumber = str_pad($lastNumber + 1, 5, '0', STR_PAD_LEFT);
-        $year = date('y'); // Get the current year (e.g., 24)
+        $year = "26"; // Get the current year (e.g., 24)
         $newGenerated = '1' . $newNumber;
-        return "{$matCentre}/{$courseCode}/{$year}/{$newGenerated}";
+        $newMatricNumber = "{$matCentre}/{$courseCode}/{$year}/{$newGenerated}";
+        while(self::where('matric_number', $newMatricNumber)->exists()) {
+            $newGenerated++;
+            $newMatricNumber = "{$matCentre}/{$courseCode}/{$year}/{$newGenerated}";
+        }
+        return  $newMatricNumber;
     }
 }
