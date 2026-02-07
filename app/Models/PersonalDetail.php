@@ -169,6 +169,8 @@ class PersonalDetail extends Model
             $matCentre = 'PG'; // Default or other centre code
         } elseif ($centre == 'Pandogari') {
             $matCentre = 'PD'; // Default or other centre code
+        } elseif ($centre == 'Agaie') {
+            $matCentre = 'AG'; // Default or other centre code
         }
         
 
