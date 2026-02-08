@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Models\ClearanceRequest;
 use App\Models\PersonalDetail;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
@@ -145,6 +146,30 @@ class PaymentController extends Controller
                 'payload' => $request->all(),
             ]);
             Http::post('http://127.0.0.1:9000/api/paystack/webhook', $payload);
+            break;
+        case 'clearance_acceptance':
+            Log::info('Webhook Clearance Acceptance HERE', [
+                'payload' => $request->all(),
+            ]);
+            if ($payload['event'] === 'charge.success') {
+                $reference = $payload['data']['reference'];
+                $clearanceRequestId = $payload['data']['metadata']['clearance_request_id'] ?? null;
+                $clearanceRequest = ClearanceRequest::find($clearanceRequestId);
+
+                if ($clearanceRequest) {
+                    $clearanceRequest->acceptance_paid = true;
+                    $clearanceRequest->acceptance_reference = $reference;
+                    $clearanceRequest->acceptance_paid_at = now();
+                    $clearanceRequest->save();
+
+                    return response()->json([
+                        'status' => 'success',
+                        'clearance_request' => $clearanceRequest,
+                    ]);
+                }
+
+                return response()->json(['status' => 'error', 'message' => 'Clearance request not found']);
+            }
             break;
         default:
             return response()->json(['status' => 'ignored']);

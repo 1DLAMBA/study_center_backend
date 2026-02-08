@@ -1,6 +1,8 @@
 <?php
 
 use App\Http\Controllers\ApplicationController;
+use App\Http\Controllers\ClearanceDepartmentController;
+use App\Http\Controllers\ClearanceRequestController;
 use App\Http\Controllers\PaymentController;
 use Illuminate\Http\Request;
 use App\Http\Controllers\BioDataController;
@@ -65,6 +67,15 @@ Route::get('/file/get/{filename}/{visibility?}', [FileUploadController::class, '
 
 Route::apiResource('bio-data', BioDataController::class);
 // Route::get('/bio-data/{id}', [BioDataController::class, 'show']);
+
+Route::apiResource('clearances', ClearanceRequestController::class);
+Route::post('clearances/{clearance}/approve', [ClearanceRequestController::class, 'approve']);
+Route::post('clearances/{clearance}/reject', [ClearanceRequestController::class, 'reject']);
+Route::post('clearances/{clearance}/departments/{departmentId}', [ClearanceRequestController::class, 'updateDepartmentStatus']);
+Route::get('clearances/{clearance}/acceptance-config', [ClearanceRequestController::class, 'acceptanceConfig']);
+Route::post('clearances/{clearance}/mark-acceptance-paid', [ClearanceRequestController::class, 'markAcceptancePaid']);
+
+Route::apiResource('clearance-departments', ClearanceDepartmentController::class);
 
 // WEBHOOK
 Route::post('/paystack/webhook', [PaymentController::class, 'handleWebhook']);

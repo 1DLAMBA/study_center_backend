@@ -65,6 +65,11 @@ class PersonalDetail extends Model
         return $this->hasOne(BioRegistration::class, 'application_number', 'id');
     }
 
+    public function clearanceRequests()
+    {
+        return $this->hasMany(ClearanceRequest::class, 'personal_detail_id');
+    }
+
     public static function generateMatricNumber($program, $centre)
     {
         // Initialize school code
