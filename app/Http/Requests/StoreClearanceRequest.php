@@ -15,7 +15,7 @@ class StoreClearanceRequest extends FormRequest
     {
         return [
             'personal_detail_id' => ['required', 'exists:personal_details,id'],
-            'fees_receipt' => ['required', 'file', 'mimes:pdf', 'max:2048'],
+            'fees_receipt' => ['required', 'file', 'mimes:pdf', 'max:5120'],
         ];
     }
 }

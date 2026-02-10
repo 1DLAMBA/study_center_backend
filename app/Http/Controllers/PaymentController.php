@@ -11,7 +11,26 @@ use Illuminate\Support\Facades\Log;
 
 class PaymentController extends Controller
 {
-    //
+    /**
+     * Verify a Paystack transaction by reference (server-side; keeps secret key secure).
+     */
+    public function verifyTransaction(string $reference)
+    {
+        $secret = env('PAYSTACK_SECRET_KEY');
+        if (empty($secret)) {
+            return response()->json(['status' => false, 'message' => 'Verification not configured'], 500);
+        }
+
+        $response = Http::withToken($secret)
+            ->get("https://api.paystack.co/transaction/verify/{$reference}");
+
+        $data = $response->json();
+        if (! $response->successful() || ! ($data['status'] ?? false)) {
+            return response()->json($data ?: ['status' => false, 'message' => 'Verification failed'], 400);
+        }
+
+        return response()->json($data);
+    }
 
     public function handleWebhook(Request $request)
 {

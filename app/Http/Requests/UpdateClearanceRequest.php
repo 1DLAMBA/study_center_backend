@@ -15,7 +15,7 @@ class UpdateClearanceRequest extends FormRequest
     {
         return [
             'matric_number' => ['sometimes', 'string', 'regex:/^([A-Z]{2}\/)?[A-Z]{2}\/\d{2}\/\d{6}$/i'],
-            'fees_receipt' => ['sometimes', 'file', 'mimes:pdf', 'max:2048'],
+            'fees_receipt' => ['sometimes', 'file', 'mimes:pdf', 'max:5120'],
         ];
     }
 }

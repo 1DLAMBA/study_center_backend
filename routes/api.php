@@ -77,5 +77,8 @@ Route::post('clearances/{clearance}/mark-acceptance-paid', [ClearanceRequestCont
 
 Route::apiResource('clearance-departments', ClearanceDepartmentController::class);
 
+// Paystack: verify transaction (server-side; frontend must not use secret key)
+Route::get('/verify-paystack/{reference}', [PaymentController::class, 'verifyTransaction']);
+
 // WEBHOOK
 Route::post('/paystack/webhook', [PaymentController::class, 'handleWebhook']);
