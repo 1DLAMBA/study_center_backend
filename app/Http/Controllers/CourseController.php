@@ -79,4 +79,22 @@ class CourseController extends Controller
 
         return response()->json(['message' => 'Course deleted successfully']);
     }
+
+    // Delete all courses by application ID
+    public function destroyByApplication($applicationId)
+    {
+        $deletedCount = Course::where('application_id', $applicationId)->delete();
+
+        if ($deletedCount === 0) {
+            return response()->json([
+                'message' => 'No courses found for the specified application',
+                'deleted_count' => 0,
+            ], 404);
+        }
+
+        return response()->json([
+            'message' => 'Courses deleted successfully',
+            'deleted_count' => $deletedCount,
+        ]);
+    }
 }

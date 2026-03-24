@@ -7,7 +7,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 
 
-class fileUploadController extends Controller
+class FileUploadController extends Controller
 {
     public function upload(Request $request)
     {
