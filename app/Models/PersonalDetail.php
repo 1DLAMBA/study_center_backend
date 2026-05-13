@@ -37,6 +37,7 @@ class PersonalDetail extends Model
         'application_reference',
         'couse_fee_date',
         'course_fee_reference',
+        'fee_academic_session',
         'course_paid',
         'has_admission',
         'matric_number',

@@ -247,6 +247,7 @@ class PersonalDetailController extends Controller
             'email' => 'nullable',
             'course_fee_reference' => 'nullable',
             'couse_fee_date' => 'nullable',
+            'fee_academic_session' => 'nullable|string|in:2024/2025,2025/2026',
             'gender' => 'nullable',
             'nin' => 'nullable|string',
             'olevel1' => 'nullable|string',

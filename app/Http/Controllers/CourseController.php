@@ -23,7 +23,7 @@ class CourseController extends Controller
             'application_id' => 'nullable',
             'mode_of_course' => 'nullable',
             'subject_of_study' => 'nullable',
-            'session' => 'nullable',
+            'session' => 'nullable|string|in:2024/2025,2025/2026',
             'semester' => 'nullable',
             'course_type' => 'nullable',
             'level_of_course' => 'nullable',
