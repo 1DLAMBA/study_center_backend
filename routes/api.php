@@ -44,9 +44,17 @@ Route::post('/applications', [ApplicationController::class, 'store']);
 Route::post('/school-fees', [ApplicationController::class, 'school_fees']);
 
 Route::post('/student_check', [PersonalDetailController::class, 'find']);
+// Admin: minimal student add + matric lookup. Registered before the
+// personal-details apiResource so the static paths cannot be swallowed by
+// the {personal_detail} parameter.
+Route::post('admin/minimal-students/check-matric', [PersonalDetailController::class, 'checkMatric']);
+Route::post('admin/minimal-students', [PersonalDetailController::class, 'storeMinimalAdmin']);
 Route::apiResource('personal-details', PersonalDetailController::class);
 Route::get('personal-details-paged', [PersonalDetailController::class, 'indexPage']);
 Route::get('verify_reference/{reference}', [PersonalDetailController::class, 'reference']);
+// Bulk import CSV sample must sit above import/{centre} so `sample-csv`
+// is not captured as a centre slug.
+Route::get('import/sample-csv', [PersonalDetailController::class, 'downloadImportSample']);
 Route::post('import/{centre}', [PersonalDetailController::class, 'import']);
 Route::post('check', [PersonalDetailController::class, 'check']);
 Route::get('approve/{id}', [PersonalDetailController::class, 'approve']);

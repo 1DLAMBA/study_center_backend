@@ -24,32 +24,37 @@ class StudentsImport implements ToModel, WithHeadingRow, WithStartRow
 
     public function model(array $row)
     {
-        if (!isset($row['name']) || is_null($row['adm_no'])) {
-            $this->currentCourse = $row['name']; // Update the current course
-            return null; // Skip this row
-        }
-        $existingStudent = PersonalDetail::where('matric_number', $row['adm_no'])->first();
+        $name = isset($row['name']) ? trim((string) $row['name']) : '';
+        $admNo = isset($row['adm_no']) ? trim((string) $row['adm_no']) : '';
 
-        if ($existingStudent) {
-            // Update the existing record
-            $existingStudent->update([
-                'other_names' => $row['name'],
+        // Course-header rows: name present, adm_no blank/null. Empty-string
+        // matters for CSV uploads where adm_no comes through as '' not null.
+        if ($admNo === '') {
+            if ($name !== '') {
+                $this->currentCourse = $name;
+            }
+            return null;
+        }
+
+        if ($name === '' || $this->currentCourse === null) {
+            return null;
+        }
+
+        // updateOrCreate keyed by matric_number keeps re-uploads idempotent:
+        // running the same file twice updates the existing row instead of
+        // creating a duplicate. application_number stays in lockstep with
+        // matric_number so admin lookups by either field still resolve.
+        PersonalDetail::updateOrCreate(
+            ['matric_number' => $admNo],
+            [
+                'application_number' => $admNo,
+                'other_names' => $name,
                 'course' => $this->currentCourse,
                 'desired_study_cent' => $this->centre,
                 'has_admission' => true,
-            ]);
-            return null; // Skip creating a new instance
-        }
-    
-        // Insert a new record if it doesn't exist
-        return new PersonalDetail([
-            'matric_number' => $row['adm_no'],
-            'application_number' => $row['adm_no'],
-            'other_names' => $row['name'],
-            'course' => $this->currentCourse,
-            'desired_study_cent' => $this->centre,
-            'has_admission' => true,
-        ]);
+            ]
+        );
 
+        return null;
     }
 }

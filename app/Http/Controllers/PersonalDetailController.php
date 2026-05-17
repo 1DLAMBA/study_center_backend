@@ -104,6 +104,97 @@ class PersonalDetailController extends Controller
     }
 
     /**
+     * Stream a CSV template that matches the StudentsImport heading row
+     * (`name`, `adm_no`). One course-header row + a single example student row
+     * is enough to show the expected structure; admins can extend it before
+     * uploading. UTF-8 BOM keeps Excel from corrupting names on double-click.
+     */
+    public function downloadImportSample()
+    {
+        $filename = 'student_import_sample.csv';
+
+        return response()->streamDownload(function () {
+            $out = fopen('php://output', 'w');
+            // BOM so Excel opens UTF-8 cleanly
+            fwrite($out, "\xEF\xBB\xBF");
+            fputcsv($out, ['name', 'adm_no']);
+            fputcsv($out, ['Mathematics / Geography', '']);
+            fputcsv($out, ['Ada Lovelace', 'ADA/MK/26/199001']);
+            fputcsv($out, ['Primary Education Studies (Double Major)', '']);
+            fputcsv($out, ['Grace Hopper', 'GRC/MK/26/199002']);
+            fclose($out);
+        }, $filename, [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+        ]);
+    }
+
+    /**
+     * Admin lookup: does this matric / application number already exist?
+     * Returns a minimal payload so the UI can short-circuit the create form
+     * without leaking unrelated student fields. Mirrors `find()` semantics but
+     * always returns 200 + boolean so the SPA can avoid try/catch on 404.
+     */
+    public function checkMatric(Request $request)
+    {
+        $matric = trim((string) $request->input('matric_number', ''));
+        if ($matric === '') {
+            return response()->json([
+                'message' => 'matric_number is required',
+            ], 422);
+        }
+
+        $existing = PersonalDetail::where('matric_number', $matric)
+            ->orWhere('application_number', $matric)
+            ->first(['id', 'matric_number', 'application_number', 'other_names', 'course', 'desired_study_cent']);
+
+        return response()->json([
+            'exists' => (bool) $existing,
+            'student' => $existing,
+        ]);
+    }
+
+    /**
+     * Admin-only minimal create. Mirrors the field set used by
+     * StudentsImport so a single-add row is indistinguishable from a bulk
+     * import row in the rest of the app (clearance, lists, exports).
+     */
+    public function storeMinimalAdmin(Request $request)
+    {
+        $data = $request->validate([
+            'matric_number' => 'required|string|max:64',
+            'other_names' => 'nullable|string|max:255',
+            'course' => 'required|string|max:255',
+            'desired_study_cent' => 'required|string|max:255',
+        ]);
+
+        $matric = trim($data['matric_number']);
+
+        $duplicate = PersonalDetail::where('matric_number', $matric)
+            ->orWhere('application_number', $matric)
+            ->exists();
+
+        if ($duplicate) {
+            return response()->json([
+                'message' => 'A student with this matric/application number already exists.',
+            ], 409);
+        }
+
+        $personalDetail = PersonalDetail::create([
+            'matric_number' => $matric,
+            'application_number' => $matric,
+            'other_names' => $data['other_names'] ?? null,
+            'course' => $data['course'],
+            'desired_study_cent' => $data['desired_study_cent'],
+            'has_admission' => true,
+        ]);
+
+        return response()->json([
+            'message' => 'Student added successfully',
+            'data' => $personalDetail,
+        ], 201);
+    }
+
+    /**
      * Store a newly created personal detail in storage.
      */
     public function check(Request $request)
@@ -185,7 +276,15 @@ class PersonalDetailController extends Controller
 
         $applicationNumber = $request->input('application_number');
 
-        $personalDetail = PersonalDetail::with('studentDetail')->where('application_number', $applicationNumber)->first();
+        // Match either application_number or matric_number so admin search by
+        // matric works even when the two columns have diverged (e.g. legacy
+        // imports or pre-acceptance rows). Response shapes below are unchanged.
+        $personalDetail = PersonalDetail::with('studentDetail')
+            ->where(function ($query) use ($applicationNumber) {
+                $query->where('application_number', $applicationNumber)
+                    ->orWhere('matric_number', $applicationNumber);
+            })
+            ->first();
         if ($personalDetail){
 
             if ($personalDetail->has_admission){
@@ -199,9 +298,15 @@ class PersonalDetailController extends Controller
                      
                 }
     
-            } else{
-              return response()->json(['message' => 'pending'], 425);
-    
+            } else {
+                // Return 200 with the full payload so admin tooling can still
+                // operate on the row (e.g. change course before admission).
+                // Callers that need to react to the pending state should branch
+                // on `message === 'pending'` rather than HTTP status.
+                return response()->json([
+                    'message' => 'pending',
+                    'user' => $personalDetail,
+                ], 200);
             }
         } else{
             return response()->json(['message' => 'Student not found'], 404);

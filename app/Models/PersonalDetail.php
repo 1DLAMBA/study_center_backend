@@ -71,137 +71,169 @@ class PersonalDetail extends Model
         return $this->hasMany(ClearanceRequest::class, 'personal_detail_id');
     }
 
+    /**
+     * Intake year embedded in generated matric numbers.
+     * Lifted to a constant so callers can override (e.g. via config) without
+     * touching the generator body.
+     */
+    public const MATRIC_INTAKE_YEAR = '26';
+
+    /**
+     * Sentinel returned when the supplied study centre is not in the map.
+     * Keeps generation deterministic and lets a unique index / audit catch it.
+     */
+    public const UNKNOWN_CENTRE_CODE = 'XX';
+
+    /**
+     * Programme → department-code mapping. Lists mirror the original
+     * implementation; extracted to a map so adding programmes is a one-line
+     * change and lookups stay O(n) across a small dataset.
+     */
+    private static array $courseCodeMap = [
+        'ED' => [
+            'Primary Education Studies (Double Major)',
+            'Early Childhood Care Education (Double Major)',
+        ],
+        'SE' => [
+            'Mathematics / Geography',
+            'Maths / Economics',
+            'Maths / Biology',
+            'Maths / Special Education',
+            'Integrated Sciences (Double Major)',
+            'Biology / Geography',
+            'Maths / Computer Science',
+            'PHE (Double Major)',
+            'Biology / Special Education',
+            'Biology / Inter Science',
+        ],
+        'TE' => [
+            'Technical Education Double Major',
+            'Electrical / Electronics',
+            'Automobile',
+            'Building',
+            'Wood Work',
+            'Metal Work',
+        ],
+        'AS' => [
+            'Geography / History',
+            'Geography / Economics',
+            'Geography / Social Studies',
+            'History / CRS',
+            'History / Islamic Studies',
+            'Social Studies / Economics',
+            'Social Studies / CRS',
+            'Social Studies / Islamic Studies',
+            'Islamic Studies / Special Education',
+            'Eco / Special Education',
+            'CRS / Special Education',
+            'History / Special Education',
+        ],
+        'LA' => [
+            'English / History',
+            'English / CRS',
+            'English / Arabic',
+            'English / Hausa',
+            'English / Social Studies',
+            'English / Islamic Studies',
+            'Hausa / Islamic Studies',
+            'Hausa / Arabic',
+            'Hausa / Social Studies',
+            'Arabic / Islamic Studies',
+            'Arabic / Social Studies',
+            'English / Special Education',
+            'Hausa / Special Education',
+        ],
+        'VE' => [
+            'Agricultural Science Education (Double Major)',
+            'Home Economics (Double Major)',
+            'Business Education (Double Major)',
+        ],
+    ];
+
+    /**
+     * Centre-name → two-letter code map. Keys are lowercased so input is
+     * matched case-insensitively after trim — fixes the original branch list
+     * where any spacing/casing drift left $matCentre undefined.
+     */
+    private static array $centreCodeMap = [
+        'suleja' => 'SU',
+        'rijau' => 'RJ',
+        'gulu' => 'GL',
+        'new bussa' => 'NB',
+        'mokwa' => 'MK',
+        'kagara' => 'KG',
+        'salka' => 'SL',
+        'kontogora' => 'KT',
+        'katcha' => 'KC',
+        'doko' => 'DK',
+        'gawu' => 'GW',
+        'bida' => 'BD',
+        'patigi' => 'PG',
+        'pandogari' => 'PD',
+        'agaie' => 'AG',
+    ];
+
     public static function generateMatricNumber($program, $centre)
     {
-        // Initialize school code
-        $courseCode = "UNKNOWN"; // Default value if no match is found
+        $courseCode = self::resolveCourseCode($program);
+        $matCentre = self::resolveCentreCode($centre);
+        $year = self::MATRIC_INTAKE_YEAR;
 
-        // Determine the school code using if-else
-        if (in_array($program, [
-            "Primary Education Studies (Double Major)",
-            "Early Childhood Care Education (Double Major)"
-        ])) {
-            $courseCode = "ED";
-        } elseif (in_array($program, [
-            "Mathematics / Geography",
-            "Maths / Economics",
-            "Maths / Biology",
-            "Maths / Special Education",
-            "Integrated Sciences (Double Major)",
-            "Biology / Geography",
-            "Maths / Computer Science",
-            "PHE (Double Major)",
-            "Biology / Special Education",
-            "Biology / Inter Science"
-        ])) {
-            $courseCode = "SE";
-        } elseif (in_array($program, [
-            "Technical Education Double Major",
-            "Electrical / Electronics",
-            "Automobile",
-            "Building",
-            "Wood Work",
-            "Metal Work"
-        ])) {
-            $courseCode = "TE";
-        } elseif (in_array($program, [
-            "Geography / History",
-            "Geography / Economics",
-            "Geography / Social Studies",
-            "History / CRS",
-            "History / Islamic Studies",
-            "Social Studies / Economics",
-            "Social Studies / CRS",
-            "Social Studies / Islamic Studies",
-            "Islamic Studies / Special Education",
-            "Eco / Special Education",
-            "CRS / Special Education",
-            "History / Special Education"
-        ])) {
-            $courseCode = "AS";
-        } elseif (in_array($program, [
-            "English / History",
-            "English / CRS",
-            "English / Arabic",
-            "English / Hausa",
-            "English / Social Studies",
-            "English / Islamic Studies",
-            "Hausa / Islamic Studies",
-            "Hausa / Arabic",
-            "Hausa / Social Studies",
-            "Arabic / Islamic Studies",
-            "Arabic / Social Studies",
-            "English / Special Education",
-            "Hausa / Special Education"
-        ])) {
-            $courseCode = "LA";
-        } elseif (in_array($program, [
-            "Agricultural Science Education (Double Major)",
-            "Home Economics (Double Major)",
-            "Business Education (Double Major)"
-        ])) {
-            $courseCode = "VE";
+        Log::debug('generateMatricNumber inputs', [
+            'program' => $program,
+            'centre' => $centre,
+            'course_code' => $courseCode,
+            'centre_code' => $matCentre,
+            'year' => $year,
+        ]);
+
+        $prefix = "{$matCentre}/{$courseCode}/{$year}/";
+
+        // Scope the running counter by centre + department + intake year so
+        // independent cohorts cannot poach each other's serials. Parse the
+        // numeric tail with a regex instead of substr(-5) so any non-conforming
+        // legacy rows are skipped rather than corrupting the next number.
+        $existingTails = self::where('matric_number', 'like', $prefix . '%')
+            ->pluck('matric_number');
+
+        $lastNumber = 10000;
+        foreach ($existingTails as $matric) {
+            $tail = substr((string) $matric, strlen($prefix));
+            if (!preg_match('/^1(\d{5})$/', $tail, $matches)) {
+                continue;
+            }
+            $serial = (int) $matches[1];
+            if ($serial > $lastNumber) {
+                $lastNumber = $serial;
+            }
         }
 
-        // Log school code (for debugging)
-        Log::debug('SCHOOL CODE', [$courseCode]);
+        do {
+            $lastNumber++;
+            $newGenerated = '1' . str_pad((string) $lastNumber, 5, '0', STR_PAD_LEFT);
+            $newMatricNumber = $prefix . $newGenerated;
+        } while (self::where('matric_number', $newMatricNumber)->exists());
 
-        // Determine the centre code
-        if ($centre == 'suleja') {
-            $matCentre = 'SU';
-        } elseif ($centre == 'Rijau') {
-            $matCentre = 'RJ'; // Default or other centre code
-        } elseif ($centre == 'Gulu') {
-            $matCentre = 'GL'; // Default or other centre code
-        } elseif ($centre == 'New Bussa') {
-            $matCentre = 'NB'; // Default or other centre code
-        } elseif ($centre == 'Mokwa') {
-            $matCentre = 'MK'; // Default or other centre code
-        } elseif ($centre == 'Kagara') {
-            $matCentre = 'KG'; // Default or other centre code
-        } elseif ($centre == 'Salka') {
-            $matCentre = 'SL'; // Default or other centre code
-        } elseif ($centre == 'Kontogora') {
-            $matCentre = 'KT'; // Default or other centre code
-        } elseif ($centre == 'Katcha') {
-            $matCentre = 'KC'; // Default or other centre code
-        } elseif ($centre == 'Doko') {
-            $matCentre = 'DK'; // Default or other centre code
-        } elseif ($centre == 'Gawu') {
-            $matCentre = 'GW'; // Default or other centre code
-        } elseif ($centre == 'Bida') {
-            $matCentre = 'BD'; // Default or other centre code
-        } elseif ($centre == 'Patigi') {
-            $matCentre = 'PG'; // Default or other centre code
-        } elseif ($centre == 'Pandogari') {
-            $matCentre = 'PD'; // Default or other centre code
-        } elseif ($centre == 'Agaie') {
-            $matCentre = 'AG'; // Default or other centre code
+        return $newMatricNumber;
+    }
+
+    private static function resolveCourseCode($program): string
+    {
+        foreach (self::$courseCodeMap as $code => $programs) {
+            if (in_array($program, $programs, true)) {
+                return $code;
+            }
         }
-        
+        return 'UNKNOWN';
+    }
 
-
-        // Get the last matric number for this program
-        $latestStudent = self::where('course', $program)
-            ->latest('matric_number')
-            ->first();
-
-        // Extract the sequential part of the latest matric number
-        if ($latestStudent) {
-            $lastNumber = (int) substr($latestStudent->matric_number, -5);
-        } else {
-            $lastNumber = 10000; // Start from 10001 if no records exist
+    private static function resolveCentreCode($centre): string
+    {
+        $key = strtolower(trim((string) $centre));
+        if ($key === '' || !isset(self::$centreCodeMap[$key])) {
+            Log::warning('generateMatricNumber: unknown centre', ['centre' => $centre]);
+            return self::UNKNOWN_CENTRE_CODE;
         }
-
-        // Generate the new matric number
-        $newNumber = str_pad($lastNumber + 1, 5, '0', STR_PAD_LEFT);
-        $year = "26"; // Get the current year (e.g., 24)
-        $newGenerated = '1' . $newNumber;
-        $newMatricNumber = "{$matCentre}/{$courseCode}/{$year}/{$newGenerated}";
-        while(self::where('matric_number', $newMatricNumber)->exists()) {
-            $newGenerated++;
-            $newMatricNumber = "{$matCentre}/{$courseCode}/{$year}/{$newGenerated}";
-        }
-        return  $newMatricNumber;
+        return self::$centreCodeMap[$key];
     }
 }
