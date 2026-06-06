@@ -13,6 +13,10 @@ class ClearanceRequestService
 {
     public const ACCEPTANCE_AMOUNT = 8731;
 
+    public function __construct(
+        private readonly SchoolFeesGateService $schoolFeesGate
+    ) {}
+
     public function list(array $filters = [])
     {
         $query = ClearanceRequest::with([
@@ -35,9 +39,9 @@ class ClearanceRequestService
     {
         $personalDetail = PersonalDetail::findOrFail($data['personal_detail_id']);
 
-        if (!$personalDetail->has_paid || !$personalDetail->course_paid) {
+        if (! $this->schoolFeesGate->canRequestClearance($personalDetail)) {
             throw ValidationException::withMessages([
-                'payment' => 'Student has not completed school fees.',
+                'payment' => 'Student has not completed required school fees (including previous session on backup where applicable).',
             ]);
         }
 
@@ -97,9 +101,9 @@ class ClearanceRequestService
     {
         $personalDetail = $clearanceRequest->personalDetail;
 
-        if (!$personalDetail || !$personalDetail->has_paid || !$personalDetail->course_paid) {
+        if (! $personalDetail || ! $this->schoolFeesGate->canRequestClearance($personalDetail)) {
             throw ValidationException::withMessages([
-                'payment' => 'Student has not completed school fees.',
+                'payment' => 'Student has not completed required school fees (including previous session on backup where applicable).',
             ]);
         }
 
@@ -185,7 +189,7 @@ class ClearanceRequestService
 
         if ($allApproved) {
             $personalDetail = $clearanceRequest->personalDetail;
-            if ($personalDetail && $personalDetail->has_paid && $personalDetail->course_paid) {
+            if ($personalDetail && $this->schoolFeesGate->canRequestClearance($personalDetail)) {
                 $clearanceRequest->update([
                     'status' => ClearanceRequest::STATUS_APPROVED,
                     'approved_at' => now(),

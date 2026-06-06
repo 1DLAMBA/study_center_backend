@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Controllers\Controller;
 use App\Models\ClearanceRequest;
 use App\Models\PersonalDetail;
+use App\Services\BackupPersonalDetailSyncService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -32,7 +33,7 @@ class PaymentController extends Controller
         return response()->json($data);
     }
 
-    public function handleWebhook(Request $request)
+    public function handleWebhook(Request $request, BackupPersonalDetailSyncService $backupSync)
     {
         $secret = env('PAYSTACK_SECRET_KEY');
         $signature = $request->header('x-paystack-signature');
@@ -95,93 +96,35 @@ class PaymentController extends Controller
 
         switch ($payType) {
 
-            // ── Complete school fees (₦40,000) ────────────────────────────────
             case 'complete_school_fees':
-                Log::info('[Webhook] complete_school_fees — looking up student', [
-                    'user_id'   => $userId,
-                    'reference' => $reference,
-                ]);
-                $student = PersonalDetail::where('id', $userId)->first();
-                if ($student) {
-                    $student->course_paid          = true;
-                    $student->has_paid             = true;
-                    $student->couse_fee_date       = $reference;
-                    $student->course_fee_reference = now();
-                    if ($feeSession !== null) {
-                        $student->fee_academic_session = $feeSession;
-                    }
-                    $student->save();
-                    Log::info('[Webhook] complete_school_fees — student UPDATED', [
-                        'student_id'           => $student->id,
-                        'has_paid'             => $student->has_paid,
-                        'course_paid'          => $student->course_paid,
-                        'fee_academic_session' => $student->fee_academic_session,
-                    ]);
-                    return response()->json(['status' => 'success']);
-                }
-                Log::error('[Webhook] complete_school_fees — student NOT FOUND', [
-                    'user_id'   => $userId,
-                    'reference' => $reference,
-                ]);
-                return response()->json(['status' => 'error', 'message' => 'Student not found']);
-
-            // ── 60% partial school fees (₦24,000) ────────────────────────────
             case 'partial_school_fees':
-                Log::info('[Webhook] partial_school_fees — looking up student', [
-                    'user_id'   => $userId,
-                    'reference' => $reference,
-                ]);
-                $student = PersonalDetail::where('id', $userId)->first();
-                if ($student) {
-                    $student->has_paid             = true;
-                    $student->couse_fee_date       = $reference;
-                    $student->course_fee_reference = now();
-                    if ($feeSession !== null) {
-                        $student->fee_academic_session = $feeSession;
-                    }
-                    $student->save();
-                    Log::info('[Webhook] partial_school_fees — student UPDATED', [
-                        'student_id'           => $student->id,
-                        'has_paid'             => $student->has_paid,
-                        'fee_academic_session' => $student->fee_academic_session,
-                    ]);
-                    return response()->json(['status' => 'success']);
-                }
-                Log::error('[Webhook] partial_school_fees — student NOT FOUND', [
-                    'user_id'   => $userId,
-                    'reference' => $reference,
-                ]);
-                return response()->json(['status' => 'error', 'message' => 'Student not found']);
-
-            // ── 40% balance completion (₦16,000) ─────────────────────────────
             case 'school_fees_completion':
-                Log::info('[Webhook] school_fees_completion — looking up student', [
-                    'user_id'   => $userId,
-                    'reference' => $reference,
+                Log::info("[Webhook] {$payType} — looking up student", [
+                    'user_id'     => $userId,
+                    'reference'   => $reference,
+                    'fee_session' => $feeSession,
                 ]);
                 $student = PersonalDetail::where('id', $userId)->first();
-                if ($student) {
-                    $student->has_paid             = true;
-                    $student->course_paid          = true;
-                    $student->couse_fee_date       = $reference;
-                    $student->course_fee_reference = now();
-                    if ($feeSession !== null) {
-                        $student->fee_academic_session = $feeSession;
-                    }
-                    $student->save();
-                    Log::info('[Webhook] school_fees_completion — student UPDATED', [
-                        'student_id'           => $student->id,
-                        'has_paid'             => $student->has_paid,
-                        'course_paid'          => $student->course_paid,
-                        'fee_academic_session' => $student->fee_academic_session,
+                if (! $student) {
+                    Log::error("[Webhook] {$payType} — student NOT FOUND", [
+                        'user_id'   => $userId,
+                        'reference' => $reference,
                     ]);
-                    return response()->json(['status' => 'success']);
+
+                    return response()->json(['status' => 'error', 'message' => 'Student not found']);
                 }
-                Log::error('[Webhook] school_fees_completion — student NOT FOUND', [
-                    'user_id'   => $userId,
-                    'reference' => $reference,
+
+                $this->applySchoolFeePayment($student, $userId, $payType, $feeSession, $reference, $backupSync);
+
+                Log::info("[Webhook] {$payType} — processed", [
+                    'student_id'           => $student->id,
+                    'fee_session'          => $feeSession,
+                    'has_paid'             => $student->has_paid,
+                    'course_paid'          => $student->course_paid,
+                    'fee_academic_session' => $student->fee_academic_session,
                 ]);
-                return response()->json(['status' => 'error', 'message' => 'Student not found']);
+
+                return response()->json(['status' => 'success']);
 
             // ── Acceptance fee (₦3,000) — generates matric number ─────────────
             case 'acceptance_fees':
@@ -254,6 +197,49 @@ class PaymentController extends Controller
                     'reference' => $reference,
                 ]);
                 return response()->json(['status' => 'ignored']);
+        }
+    }
+
+    /**
+     * 2024/2025 fees for students on the backup DB update backup only — not primary payment flags.
+     */
+    private function applySchoolFeePayment(
+        PersonalDetail $student,
+        int|string|null $userId,
+        string $payType,
+        ?string $feeSession,
+        string $reference,
+        BackupPersonalDetailSyncService $backupSync
+    ): void {
+        $isLastSession = $feeSession === BackupPersonalDetailSyncService::LAST_FEE_SESSION;
+        $onBackup      = $isLastSession && $backupSync->existsOnBackup($userId);
+
+        if ($onBackup && $backupSync->sync($userId, $payType, $feeSession, $reference)) {
+            Log::info('[Webhook] School fee applied on backup only (primary flags unchanged)', [
+                'user_id'     => $userId,
+                'pay_type'    => $payType,
+                'fee_session' => $feeSession,
+            ]);
+
+            return;
+        }
+
+        if ($payType === 'complete_school_fees' || $payType === 'school_fees_completion') {
+            $student->has_paid    = true;
+            $student->course_paid = true;
+        } elseif ($payType === 'partial_school_fees') {
+            $student->has_paid = true;
+        }
+
+        $student->couse_fee_date       = $reference;
+        $student->course_fee_reference = now();
+        if ($feeSession !== null) {
+            $student->fee_academic_session = $feeSession;
+        }
+        $student->save();
+
+        if ($isLastSession) {
+            $backupSync->sync($userId, $payType, $feeSession, $reference);
         }
     }
 

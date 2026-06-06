@@ -91,6 +91,9 @@ web_modules/
 .env.production.local
 .env.local
 
+# Scramble OpenAPI export (generated via `php artisan scramble:export`)
+/api.json
+
 # parcel-bundler cache (https://parceljs.org/)
 .cache
 .parcel-cache

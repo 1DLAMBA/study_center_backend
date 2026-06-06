@@ -31,4 +31,9 @@ return [
         'region' => env('AWS_DEFAULT_REGION', 'us-east-1'),
     ],
 
+    'backup_api' => [
+        'base_url' => rtrim((string) env('BACKUP_API_BASE_URL', ''), '/'),
+        'sync_token' => env('BACKUP_API_SYNC_TOKEN'),
+    ],
+
 ];
