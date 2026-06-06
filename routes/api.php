@@ -44,7 +44,9 @@ Route::post('/applications', [ApplicationController::class, 'store']);
 Route::post('/school-fees', [ApplicationController::class, 'school_fees']);
 
 Route::post('/student_check', [PersonalDetailController::class, 'find']);
-Route::apiResource('personal-details', PersonalDetailController::class);
+Route::apiResource('personal-details', PersonalDetailController::class)->except(['update']);
+Route::match(['put', 'patch'], 'personal-details/{personal_detail}', [PersonalDetailController::class, 'update'])
+    ->middleware('backup.sync');
 Route::get('personal-details-paged', [PersonalDetailController::class, 'indexPage']);
 Route::get('verify_reference/{reference}', [PersonalDetailController::class, 'reference']);
 Route::post('import/{centre}', [PersonalDetailController::class, 'import']);

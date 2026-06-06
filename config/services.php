@@ -31,4 +31,8 @@ return [
         'region' => env('AWS_DEFAULT_REGION', 'us-east-1'),
     ],
 
+    'backup_api' => [
+        'sync_token' => env('BACKUP_API_SYNC_TOKEN'),
+    ],
+
 ];

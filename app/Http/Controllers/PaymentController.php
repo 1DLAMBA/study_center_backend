@@ -54,6 +54,19 @@ class PaymentController extends Controller
         $payType   = $payload['data']['metadata']['pay_type'] ?? null;
         $userId    = $payload['data']['metadata']['id'] ?? null;
 
+        $allowedFeeSessions = ['2024/2025', '2025/2026'];
+        $rawFeeSession      = $payload['data']['metadata']['fee_session'] ?? null;
+        $feeSession         = in_array($rawFeeSession, $allowedFeeSessions, true) ? $rawFeeSession : null;
+        $schoolFeePayTypes  = ['complete_school_fees', 'partial_school_fees', 'school_fees_completion'];
+
+        if (in_array($payType, $schoolFeePayTypes, true) && $feeSession === null) {
+            Log::warning('[Webhook] Missing or invalid fee_session for school-fee pay_type', [
+                'pay_type'   => $payType,
+                'received'   => $rawFeeSession,
+                'reference'  => $reference,
+            ]);
+        }
+
         // ── STEP 2: Log every verified incoming webhook ────────────────────────
         Log::info('[Webhook] Received', [
             'event'     => $event,
@@ -94,11 +107,15 @@ class PaymentController extends Controller
                     $student->has_paid             = true;
                     $student->couse_fee_date       = $reference;
                     $student->course_fee_reference = now();
+                    if ($feeSession !== null) {
+                        $student->fee_academic_session = $feeSession;
+                    }
                     $student->save();
                     Log::info('[Webhook] complete_school_fees — student UPDATED', [
-                        'student_id' => $student->id,
-                        'has_paid'   => $student->has_paid,
-                        'course_paid'=> $student->course_paid,
+                        'student_id'           => $student->id,
+                        'has_paid'             => $student->has_paid,
+                        'course_paid'          => $student->course_paid,
+                        'fee_academic_session' => $student->fee_academic_session,
                     ]);
                     return response()->json(['status' => 'success']);
                 }
@@ -119,10 +136,14 @@ class PaymentController extends Controller
                     $student->has_paid             = true;
                     $student->couse_fee_date       = $reference;
                     $student->course_fee_reference = now();
+                    if ($feeSession !== null) {
+                        $student->fee_academic_session = $feeSession;
+                    }
                     $student->save();
                     Log::info('[Webhook] partial_school_fees — student UPDATED', [
-                        'student_id' => $student->id,
-                        'has_paid'   => $student->has_paid,
+                        'student_id'           => $student->id,
+                        'has_paid'             => $student->has_paid,
+                        'fee_academic_session' => $student->fee_academic_session,
                     ]);
                     return response()->json(['status' => 'success']);
                 }
@@ -140,13 +161,19 @@ class PaymentController extends Controller
                 ]);
                 $student = PersonalDetail::where('id', $userId)->first();
                 if ($student) {
+                    $student->has_paid             = true;
                     $student->course_paid          = true;
                     $student->couse_fee_date       = $reference;
                     $student->course_fee_reference = now();
+                    if ($feeSession !== null) {
+                        $student->fee_academic_session = $feeSession;
+                    }
                     $student->save();
                     Log::info('[Webhook] school_fees_completion — student UPDATED', [
-                        'student_id'  => $student->id,
-                        'course_paid' => $student->course_paid,
+                        'student_id'           => $student->id,
+                        'has_paid'             => $student->has_paid,
+                        'course_paid'          => $student->course_paid,
+                        'fee_academic_session' => $student->fee_academic_session,
                     ]);
                     return response()->json(['status' => 'success']);
                 }
