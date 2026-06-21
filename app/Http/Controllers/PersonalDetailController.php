@@ -255,15 +255,21 @@ class PersonalDetailController extends Controller
             'scratchcard_upload' => 'nullable|string',
         ]);
     Log::info('Validated Data:', $validatedData);
-    if($personalDetail->matric_number == null ){
+    // Only treat this as an application/matric request when it actually carries
+    // application data. Fee-only syncs from the main backend (has_paid, course_paid,
+    // couse_fee_date, course_fee_reference) carry neither key and must fall through
+    // to the normal update below — otherwise the fee flags are never applied.
+    $hasApplicationData = $request->filled('application_reference') || $request->filled('application_number');
 
-        if( $validatedData['application_reference'] == null){
+    if($personalDetail->matric_number == null && $hasApplicationData){
+
+        if( ! $request->filled('application_reference')){
             $personalDetail->application_number = $validatedData['application_number'];
         $personalDetail->save();
         return;
 
         }
-        
+
         $matricNumber = PersonalDetail::generateMatricNumber($personalDetail->course, $personalDetail->desired_study_cent);
         $personalDetail->matric_number = $matricNumber;
         $personalDetail->application_number = $matricNumber;
