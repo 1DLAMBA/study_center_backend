@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources;
 
+use App\Models\GraduationList;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -18,6 +19,9 @@ class ClearanceRequestResource extends JsonResource
             'id' => $this->id,
             'personal_detail_id' => $this->personal_detail_id,
             'matric_number' => $this->matric_number,
+            'on_graduation_list' => GraduationList::containsMatric(
+                $personalDetail?->matric_number ?? $this->matric_number
+            ),
             'status' => $this->status,
             'fees_receipt_path' => $this->fees_receipt_path,
             'fees_receipt_url' => $this->fees_receipt_path

@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\ClearanceDepartment;
 use App\Models\ClearanceDepartmentRequest;
 use App\Models\ClearanceRequest;
+use App\Models\GraduationList;
 use App\Models\PersonalDetail;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -35,15 +36,41 @@ class ClearanceRequestService
         return $query->get();
     }
 
+    /**
+     * Clearance gate: student must be on the uploaded graduation list, and
+     * must have fully paid either last session (2024/2025, last-session DB)
+     * or the current session (2025/2026).
+     */
+    private function assertEligibleForClearance(PersonalDetail $personalDetail): void
+    {
+        if (! GraduationList::containsMatric($personalDetail->matric_number)) {
+            throw ValidationException::withMessages([
+                'graduation' => 'Student is not on the graduation list for this session.',
+            ]);
+        }
+
+        if (! $this->schoolFeesGate->hasPaidLastOrCurrentSession($personalDetail)) {
+            throw ValidationException::withMessages([
+                'payment' => 'Student must have fully paid school fees for either the last session (2024/2025) or the current session (2025/2026).',
+            ]);
+        }
+    }
+
+    private function isEligibleForClearance(?PersonalDetail $personalDetail): bool
+    {
+        if (! $personalDetail) {
+            return false;
+        }
+
+        return GraduationList::containsMatric($personalDetail->matric_number)
+            && $this->schoolFeesGate->hasPaidLastOrCurrentSession($personalDetail);
+    }
+
     public function create(array $data, $feesReceiptFile = null): ClearanceRequest
     {
         $personalDetail = PersonalDetail::findOrFail($data['personal_detail_id']);
 
-        if (! $this->schoolFeesGate->canRequestClearance($personalDetail)) {
-            throw ValidationException::withMessages([
-                'payment' => 'Student has not completed required school fees (including previous session on backup where applicable).',
-            ]);
-        }
+        $this->assertEligibleForClearance($personalDetail);
 
         $existing = ClearanceRequest::where('personal_detail_id', $personalDetail->id)
             ->whereIn('status', [ClearanceRequest::STATUS_PENDING, ClearanceRequest::STATUS_APPROVED])
@@ -101,11 +128,13 @@ class ClearanceRequestService
     {
         $personalDetail = $clearanceRequest->personalDetail;
 
-        if (! $personalDetail || ! $this->schoolFeesGate->canRequestClearance($personalDetail)) {
+        if (! $personalDetail) {
             throw ValidationException::withMessages([
-                'payment' => 'Student has not completed required school fees (including previous session on backup where applicable).',
+                'payment' => 'Student record not found for this clearance request.',
             ]);
         }
+
+        $this->assertEligibleForClearance($personalDetail);
 
         $pendingDepartments = $clearanceRequest->departmentRequests()
             ->where('status', ClearanceDepartmentRequest::STATUS_PENDING)
@@ -189,7 +218,7 @@ class ClearanceRequestService
 
         if ($allApproved) {
             $personalDetail = $clearanceRequest->personalDetail;
-            if ($personalDetail && $this->schoolFeesGate->canRequestClearance($personalDetail)) {
+            if ($this->isEligibleForClearance($personalDetail)) {
                 $clearanceRequest->update([
                     'status' => ClearanceRequest::STATUS_APPROVED,
                     'approved_at' => now(),

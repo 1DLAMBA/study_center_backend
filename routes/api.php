@@ -11,6 +11,7 @@ use App\Http\Controllers\CourseController;
 use App\Http\Controllers\CourseDataController;
 use App\Http\Controllers\EducationalDetailsController;
 use App\Http\Controllers\FileUploadController;
+use App\Http\Controllers\GraduationListController;
 use App\Http\Controllers\PersonalDetailController;
 use App\Http\Controllers\StudentDetailController;
 use Illuminate\Support\Facades\Route;
@@ -76,6 +77,13 @@ Route::get('/file/get/{filename}/{visibility?}', [FileUploadController::class, '
 
 Route::apiResource('bio-data', BioDataController::class);
 // Route::get('/bio-data/{id}', [BioDataController::class, 'show']);
+
+// Graduation list: bulk Excel upload + lookup used to gate clearance.
+// The check route allows slashes because matric numbers contain "/"
+// (e.g. ED/22/103873); callers should URL-encode the value.
+Route::post('graduation-list/import', [GraduationListController::class, 'import']);
+Route::get('graduation-list', [GraduationListController::class, 'index']);
+Route::get('graduation-list/check/{matricNumber}', [GraduationListController::class, 'check'])->where('matricNumber', '.*');
 
 Route::apiResource('clearances', ClearanceRequestController::class);
 Route::post('clearances/{clearance}/approve', [ClearanceRequestController::class, 'approve']);

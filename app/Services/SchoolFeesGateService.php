@@ -36,8 +36,18 @@ class SchoolFeesGateService
             return false;
         }
 
-        $url      = "{$baseUrl}/personal-details/{$userId}";
-        $response = Http::timeout(15)->acceptJson()->get($url);
+        $url = "{$baseUrl}/personal-details/{$userId}";
+
+        try {
+            $response = Http::timeout(15)->acceptJson()->get($url);
+        } catch (\Illuminate\Http\Client\ConnectionException $e) {
+            Log::warning('[SchoolFeesGate] Last-session (backup) API unreachable', [
+                'user_id' => $userId,
+                'error'   => $e->getMessage(),
+            ]);
+
+            return false;
+        }
 
         if (! $response->successful()) {
             return false;
@@ -61,6 +71,20 @@ class SchoolFeesGateService
 
         if ($this->backupSync->existsOnBackup($student->id)) {
             return $this->isBackupFullyPaid($student->id);
+        }
+
+        return $this->isPrimaryFullyPaid($student);
+    }
+
+    /**
+     * Graduand fee rule: one session must be fully paid — either last
+     * session (2024/2025, held on the last-session/backup DB via its API)
+     * or the current session (2025/2026) on the primary DB.
+     */
+    public function hasPaidLastOrCurrentSession(PersonalDetail $student): bool
+    {
+        if ($this->isBackupFullyPaid($student->id)) {
+            return true;
         }
 
         return $this->isPrimaryFullyPaid($student);
