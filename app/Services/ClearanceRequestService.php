@@ -7,6 +7,7 @@ use App\Models\ClearanceDepartmentRequest;
 use App\Models\ClearanceRequest;
 use App\Models\GraduationList;
 use App\Models\PersonalDetail;
+use App\Support\CentreScope;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -33,6 +34,10 @@ class ClearanceRequestService
             $query->where('status', $filters['status']);
         }
 
+        if (!empty($filters['centre'])) {
+            CentreScope::applyClearances($query, null, $filters['centre']);
+        }
+
         return $query->get();
     }
 
@@ -41,12 +46,21 @@ class ClearanceRequestService
      * must have fully paid either last session (2024/2025, last-session DB)
      * or the current session (2025/2026).
      */
-    private function assertEligibleForClearance(PersonalDetail $personalDetail): void
+    private function assertOnGraduationList(PersonalDetail $personalDetail): void
     {
         if (! GraduationList::containsMatric($personalDetail->matric_number)) {
             throw ValidationException::withMessages([
                 'graduation' => 'Student is not on the graduation list for this session.',
             ]);
+        }
+    }
+
+    private function assertEligibleForClearance(PersonalDetail $personalDetail, bool $skipFeeGate = false): void
+    {
+        $this->assertOnGraduationList($personalDetail);
+
+        if ($skipFeeGate) {
+            return;
         }
 
         if (! $this->schoolFeesGate->hasPaidLastOrCurrentSession($personalDetail)) {
@@ -66,11 +80,18 @@ class ClearanceRequestService
             && $this->schoolFeesGate->hasPaidLastOrCurrentSession($personalDetail);
     }
 
-    public function create(array $data, $feesReceiptFile = null): ClearanceRequest
+    public function createForStaff(PersonalDetail $personalDetail, $feesReceiptFile = null, bool $skipFeeGate = false): ClearanceRequest
+    {
+        return $this->create([
+            'personal_detail_id' => $personalDetail->id,
+        ], $feesReceiptFile, $skipFeeGate);
+    }
+
+    public function create(array $data, $feesReceiptFile = null, bool $skipFeeGate = false): ClearanceRequest
     {
         $personalDetail = PersonalDetail::findOrFail($data['personal_detail_id']);
 
-        $this->assertEligibleForClearance($personalDetail);
+        $this->assertEligibleForClearance($personalDetail, $skipFeeGate);
 
         $existing = ClearanceRequest::where('personal_detail_id', $personalDetail->id)
             ->whereIn('status', [ClearanceRequest::STATUS_PENDING, ClearanceRequest::STATUS_APPROVED])
@@ -124,8 +145,11 @@ class ClearanceRequestService
         return $clearanceRequest->load(['personalDetail.bioRegistration', 'departmentRequests.department']);
     }
 
-    public function approve(ClearanceRequest $clearanceRequest): ClearanceRequest
-    {
+    public function approve(
+        ClearanceRequest $clearanceRequest,
+        bool $forceFeeOverride = false,
+        ?int $staffId = null
+    ): ClearanceRequest {
         $personalDetail = $clearanceRequest->personalDetail;
 
         if (! $personalDetail) {
@@ -134,7 +158,13 @@ class ClearanceRequestService
             ]);
         }
 
-        $this->assertEligibleForClearance($personalDetail);
+        $this->assertEligibleForClearance($personalDetail, $forceFeeOverride);
+
+        if ($forceFeeOverride && ! $clearanceRequest->fee_override) {
+            $clearanceRequest->fee_override = true;
+            $clearanceRequest->fee_override_by = $staffId;
+            $clearanceRequest->fee_override_at = now();
+        }
 
         $pendingDepartments = $clearanceRequest->departmentRequests()
             ->where('status', ClearanceDepartmentRequest::STATUS_PENDING)
@@ -156,12 +186,11 @@ class ClearanceRequestService
             ]);
         }
 
-        $clearanceRequest->update([
-            'status' => ClearanceRequest::STATUS_APPROVED,
-            'approved_at' => now(),
-            'rejected_at' => null,
-            'rejection_reason' => null,
-        ]);
+        $clearanceRequest->status = ClearanceRequest::STATUS_APPROVED;
+        $clearanceRequest->approved_at = now();
+        $clearanceRequest->rejected_at = null;
+        $clearanceRequest->rejection_reason = null;
+        $clearanceRequest->save();
 
         return $clearanceRequest->load(['personalDetail.bioRegistration', 'departmentRequests.department']);
     }

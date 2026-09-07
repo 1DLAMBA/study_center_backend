@@ -4,6 +4,9 @@ namespace App\Http\Controllers;
 
 use App\Models\PersonalDetail;
 use App\Models\StudentDetail;
+use App\Models\GraduationList;
+use App\Support\CentreScope;
+use App\Support\StaffPermissions;
 use Illuminate\Http\Request;
 use App\Imports\StudentsImport;
 use Illuminate\Support\Facades\Log;
@@ -92,11 +95,15 @@ class PersonalDetailController extends Controller
     
 
 
-    public function import(String $centre,Request $request)
+    public function import(String $centre, Request $request)
     {
         $request->validate([
             'file' => 'required|mimes:xlsx,csv',
         ]);
+
+        if (StaffPermissions::isCoordinator($request->user())) {
+            $centre = $request->user()->study_centre;
+        }
 
         Excel::import(new StudentsImport($centre), $request->file('file'));
 
@@ -167,7 +174,13 @@ class PersonalDetailController extends Controller
             'desired_study_cent' => 'required|string|max:255',
         ]);
 
-        $matric = trim($data['matric_number']);
+        if (StaffPermissions::isCoordinator($request->user())) {
+            $data['desired_study_cent'] = $request->user()->study_centre;
+        }
+
+        CentreScope::assertStudentCentre($request->user(), $data['desired_study_cent']);
+
+        $matric = GraduationList::normalizeMatric($data['matric_number']) ?? trim($data['matric_number']);
 
         $duplicate = PersonalDetail::where('matric_number', $matric)
             ->orWhere('application_number', $matric)

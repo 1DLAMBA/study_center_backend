@@ -33,6 +33,8 @@ class ClearanceRequestResource extends JsonResource
             'acceptance_paid' => $this->acceptance_paid,
             'acceptance_reference' => $this->acceptance_reference,
             'acceptance_paid_at' => $this->acceptance_paid_at,
+            'fee_override' => (bool) $this->fee_override,
+            'fee_override_reason' => $this->fee_override_reason,
             'student' => $personalDetail ? [
                 'id' => $personalDetail->id,
                 'surname' => $personalDetail->surname,

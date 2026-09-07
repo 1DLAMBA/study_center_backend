@@ -63,9 +63,17 @@ class ClearanceRequestController extends Controller
         return response()->json(['message' => 'Clearance request deleted.']);
     }
 
-    public function approve(ClearanceRequest $clearance)
+    public function approve(Request $request, ClearanceRequest $clearance)
     {
-        $approved = $this->service->approve($clearance);
+        $validated = $request->validate([
+            'force_fee_override' => ['sometimes', 'boolean'],
+        ]);
+
+        $approved = $this->service->approve(
+            $clearance,
+            (bool) ($validated['force_fee_override'] ?? false),
+            $request->user()?->id
+        );
 
         return new ClearanceRequestResource($approved);
     }

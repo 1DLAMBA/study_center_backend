@@ -24,13 +24,19 @@ class ClearanceRequest extends Model
         'acceptance_paid',
         'acceptance_reference',
         'acceptance_paid_at',
+        'fee_override',
+        'fee_override_reason',
+        'fee_override_by',
+        'fee_override_at',
     ];
 
     protected $casts = [
         'acceptance_paid' => 'boolean',
+        'fee_override' => 'boolean',
         'approved_at' => 'datetime',
         'rejected_at' => 'datetime',
         'acceptance_paid_at' => 'datetime',
+        'fee_override_at' => 'datetime',
     ];
 
     public function personalDetail()
