@@ -169,6 +169,36 @@ class PersonalDetailController extends Controller
         $personalDetail = PersonalDetail::with('studentDetail')->where('id', $id)->first();
         return response()->json($personalDetail->load('studentDetail'));
     }
+
+    /**
+     * Bulk lookup by id, e.g. ?ids=1,2,3 — one request instead of one per student.
+     * Returns a map keyed by id (as a string, since JSON object keys are strings),
+     * with a null value for any id that has no backup record, mirroring the shape
+     * the frontend previously built itself from N individual show() responses.
+     */
+    public function bulk(Request $request)
+    {
+        $ids = array_values(array_unique(array_filter(
+            array_map('trim', explode(',', (string) $request->query('ids', ''))),
+            fn ($id) => $id !== '' && is_numeric($id)
+        )));
+
+        if (empty($ids)) {
+            return response()->json([]);
+        }
+
+        $records = PersonalDetail::with('studentDetail')
+            ->whereIn('id', $ids)
+            ->get()
+            ->keyBy('id');
+
+        $result = [];
+        foreach ($ids as $id) {
+            $result[$id] = $records->get($id);
+        }
+
+        return response()->json($result);
+    }
     
     public function approve(string $id)
     {

@@ -44,6 +44,7 @@ Route::post('/applications', [ApplicationController::class, 'store']);
 Route::post('/school-fees', [ApplicationController::class, 'school_fees']);
 
 Route::post('/student_check', [PersonalDetailController::class, 'find']);
+Route::get('personal-details/bulk', [PersonalDetailController::class, 'bulk']);
 Route::apiResource('personal-details', PersonalDetailController::class)->except(['update']);
 Route::match(['put', 'patch'], 'personal-details/{personal_detail}', [PersonalDetailController::class, 'update'])
     ->middleware('backup.sync');
