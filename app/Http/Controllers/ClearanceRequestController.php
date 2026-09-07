@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Requests\StoreClearanceRequest;
 use App\Http\Requests\UpdateClearanceRequest;
 use App\Http\Resources\ClearanceRequestResource;
+use App\Models\AuditLog;
 use App\Models\ClearanceDepartmentRequest;
 use App\Models\ClearanceRequest;
 use App\Services\ClearanceRequestService;
@@ -69,10 +70,22 @@ class ClearanceRequestController extends Controller
             'force_fee_override' => ['sometimes', 'boolean'],
         ]);
 
+        $forceFeeOverride = (bool) ($validated['force_fee_override'] ?? false);
+
         $approved = $this->service->approve(
             $clearance,
-            (bool) ($validated['force_fee_override'] ?? false),
+            $forceFeeOverride,
             $request->user()?->id
+        );
+
+        AuditLog::record(
+            $request->user(),
+            $forceFeeOverride ? 'clearance.approve_with_fee_override' : 'clearance.approve',
+            $forceFeeOverride
+                ? "Approved clearance for {$approved->matric_number}, overriding the unpaid-fee check"
+                : "Approved clearance for {$approved->matric_number}",
+            'ClearanceRequest',
+            $approved->id,
         );
 
         return new ClearanceRequestResource($approved);
@@ -85,6 +98,14 @@ class ClearanceRequestController extends Controller
         ]);
 
         $rejected = $this->service->reject($clearance, $validated['reason']);
+
+        AuditLog::record(
+            $request->user(),
+            'clearance.reject',
+            "Rejected clearance for {$rejected->matric_number}: {$validated['reason']}",
+            'ClearanceRequest',
+            $rejected->id,
+        );
 
         return new ClearanceRequestResource($rejected);
     }

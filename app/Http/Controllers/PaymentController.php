@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Models\AuditLog;
 use App\Models\ClearanceRequest;
 use App\Models\Payment;
 use App\Models\PersonalDetail;
@@ -91,7 +92,7 @@ class PaymentController extends Controller
     /**
      * Admin: re-verify a payment against Paystack directly and sync our local status.
      */
-    public function adminReverify(string $reference)
+    public function adminReverify(Request $request, string $reference)
     {
         $payment = Payment::where('reference', $reference)->first();
         if (! $payment) {
@@ -116,6 +117,15 @@ class PaymentController extends Controller
         $payment->amount = $txData['amount'] ?? $payment->amount;
         $payment->verified_at = now();
         $payment->save();
+
+        AuditLog::record(
+            $request->user(),
+            'payment.reverify',
+            "Re-verified payment {$payment->reference} against Paystack — status: {$payment->status}",
+            'Payment',
+            $payment->id,
+            ['paystack_status' => $txData['status'] ?? null],
+        );
 
         return response()->json(['payment' => $payment, 'paystack' => $data]);
     }

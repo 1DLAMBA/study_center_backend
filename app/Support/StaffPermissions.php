@@ -30,6 +30,7 @@ class StaffPermissions
             'staff.manage',
             'stats.view',
             'payments.view',
+            'audit.view',
         ],
         self::CENTRE_COORDINATOR => [
             'students.view',

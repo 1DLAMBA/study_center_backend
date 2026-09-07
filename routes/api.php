@@ -10,6 +10,7 @@ use App\Http\Controllers\StaffAuthController;
 use App\Http\Controllers\StaffClearanceController;
 use App\Http\Controllers\StaffStudentController;
 use App\Http\Controllers\StaffUserController;
+use App\Http\Controllers\AuditLogController;
 use App\Http\Controllers\BioDataController;
 use App\Http\Controllers\BioRegistrationController;
 use App\Http\Controllers\CourseController;
@@ -137,5 +138,10 @@ Route::middleware(['auth:sanctum', 'staff.active'])->group(function () {
         Route::get('admin/payments', [PaymentController::class, 'adminIndex']);
         Route::get('admin/payments/{reference}', [PaymentController::class, 'adminShow']);
         Route::post('admin/payments/{reference}/reverify', [PaymentController::class, 'adminReverify']);
+    });
+
+    Route::middleware('staff.permission:audit.view')->group(function () {
+        Route::get('admin/audit-logs', [AuditLogController::class, 'index']);
+        Route::get('admin/audit-logs/actions', [AuditLogController::class, 'actions']);
     });
 });

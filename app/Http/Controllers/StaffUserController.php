@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\AuditLog;
 use App\Models\User;
 use App\Support\CentreScope;
 use App\Support\StaffPermissions;
@@ -26,6 +27,15 @@ class StaffUserController extends Controller
 
         $user = User::create($validated);
 
+        AuditLog::record(
+            $request->user(),
+            'staff.create',
+            "Created staff account {$user->email} ({$user->role})",
+            'User',
+            $user->id,
+            ['role' => $user->role, 'study_centre' => $user->study_centre],
+        );
+
         return response()->json([
             'message' => 'Staff account created.',
             'user' => StaffPermissions::payload($user),
@@ -40,7 +50,18 @@ class StaffUserController extends Controller
             unset($validated['password']);
         }
 
+        $before = $user->only(['role', 'study_centre', 'is_active']);
         $user->update($validated);
+        $after = $user->fresh()->only(['role', 'study_centre', 'is_active']);
+
+        AuditLog::record(
+            $request->user(),
+            'staff.update',
+            "Updated staff account {$user->email}",
+            'User',
+            $user->id,
+            ['before' => $before, 'after' => $after, 'password_changed' => isset($validated['password'])],
+        );
 
         return response()->json([
             'message' => 'Staff account updated.',
