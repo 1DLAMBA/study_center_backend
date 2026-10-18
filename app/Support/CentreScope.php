@@ -30,6 +30,7 @@ class CentreScope
             'Patigi',
             'Pandogari',
             'Agaie',
+            'Bacita',
         ];
     }
 

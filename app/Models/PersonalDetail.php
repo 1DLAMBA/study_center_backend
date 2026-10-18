@@ -172,6 +172,7 @@ class PersonalDetail extends Model
         'patigi' => 'PG',
         'pandogari' => 'PD',
         'agaie' => 'AG',
+        'bacita' => 'BC',
     ];
 
     public static function generateMatricNumber($program, $centre)
