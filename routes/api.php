@@ -115,6 +115,8 @@ Route::middleware(['auth:sanctum', 'staff.active'])->group(function () {
         Route::get('staff/clearances', [StaffClearanceController::class, 'index']);
     });
 
+    // 
+
     Route::middleware('staff.permission:clearance.start')->group(function () {
         Route::post('staff/clearances/start', [StaffClearanceController::class, 'start']);
     });
